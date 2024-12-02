@@ -19,7 +19,7 @@ os_arch=""
 sudo() {
     myEUID=$(id -ru)
     if [ "$myEUID" -ne 0 ]; then
-        if command -v sudo > /dev/null 2>&1; then
+        if command -v sudo >/dev/null 2>&1; then
             command sudo "$@"
         else
             err "错误: 您的系统未安装 sudo，因此无法进行该项操作。"
@@ -125,7 +125,7 @@ pre_check() {
         Docker_IMG="registry.cn-shanghai.aliyuncs.com\/naibahq\/nezha-dashboard"
     else
         if [ -z "$CN" ]; then
-            GITHUB_RAW_URL="raw.githubusercontent.com/nezhahq/scripts/main"
+            GITHUB_RAW_URL="raw.githubusercontent.com/wanyunr/nezha-scripts/refs/heads/v0"
             GITHUB_URL="github.com"
             Get_Docker_URL="get.docker.com"
             Get_Docker_Argu=" "
@@ -186,17 +186,17 @@ select_version() {
             printf "请输入选择 [1-2]："
             read -r option
             case "${option}" in
-                1)
-                    IS_DOCKER_NEZHA=1
-                    break
-                    ;;
-                2)
-                    IS_DOCKER_NEZHA=0
-                    break
-                    ;;
-                *)
-                    err "请输入正确的选择 [1-2]"
-                    ;;
+            1)
+                IS_DOCKER_NEZHA=1
+                break
+                ;;
+            2)
+                IS_DOCKER_NEZHA=0
+                break
+                ;;
+            *)
+                err "请输入正确的选择 [1-2]"
+                ;;
             esac
         done
     fi
@@ -344,26 +344,9 @@ install_agent() {
 
     echo "> 安装监控Agent"
 
-    echo "正在获取监控Agent版本号"
+    echo "使用固定版本 v0.20.5"
 
-
-    _version=$(curl -m 10 -sL "https://api.github.com/repos/nezhahq/agent/releases/latest" | grep "tag_name" | head -n 1 | awk -F ":" '{print $2}' | sed 's/\"//g;s/,//g;s/ //g')
-    if [ -z "$_version" ]; then
-        _version=$(curl -m 10 -sL "https://gitee.com/api/v5/repos/naibahq/agent/releases/latest" | awk -F '"' '{for(i=1;i<=NF;i++){if($i=="tag_name"){print $(i+2)}}}')
-    fi
-    if [ -z "$_version" ]; then
-        _version=$(curl -m 10 -sL "https://fastly.jsdelivr.net/gh/nezhahq/agent/" | grep "option\.value" | awk -F "'" '{print $2}' | sed 's/nezhahq\/agent@/v/g')
-    fi
-    if [ -z "$_version" ]; then
-        _version=$(curl -m 10 -sL "https://gcore.jsdelivr.net/gh/nezhahq/agent/" | grep "option\.value" | awk -F "'" '{print $2}' | sed 's/nezhahq\/agent@/v/g')
-    fi
-
-    if [ -z "$_version" ]; then
-        err "获取 Agent 版本号失败，请检查本机能否链接 https://api.github.com/repos/nezhahq/agent/releases/latest"
-        return 1
-    else
-        echo "当前最新版本为： ${_version}"
-    fi
+    _version="v0.20.5"
 
     # Nezha Monitoring Folder
     sudo mkdir -p $NZ_AGENT_PATH
@@ -401,14 +384,14 @@ modify_agent_config() {
 
     if [ $# -lt 3 ]; then
         echo "请先在管理面板上添加Agent，记录下密钥"
-            printf "请输入一个解析到面板所在IP的域名（不可套CDN）: "
-            read -r nz_grpc_host
-            printf "请输入面板RPC端口 (默认值 5555): "
-            read -r nz_grpc_port
-            printf "请输入Agent 密钥: "
-            read -r nz_client_secret
-            printf "是否启用针对 gRPC 端口的 SSL/TLS加密 (--tls)，需要请按 [y]，默认是不需要，不理解用户可回车跳过: "
-            read -r nz_grpc_proxy
+        printf "请输入一个解析到面板所在IP的域名（不可套CDN）: "
+        read -r nz_grpc_host
+        printf "请输入面板RPC端口 (默认值 5555): "
+        read -r nz_grpc_port
+        printf "请输入Agent 密钥: "
+        read -r nz_client_secret
+        printf "是否启用针对 gRPC 端口的 SSL/TLS加密 (--tls)，需要请按 [y]，默认是不需要，不理解用户可回车跳过: "
+        read -r nz_grpc_proxy
         echo "${nz_grpc_proxy}" | grep -qiw 'Y' && args='--tls'
         if [ -z "$nz_grpc_host" ] || [ -z "$nz_client_secret" ]; then
             err "所有选项都不能为空"
@@ -434,7 +417,7 @@ modify_agent_config() {
         sudo "${NZ_AGENT_PATH}"/nezha-agent service uninstall >/dev/null 2>&1
         sudo "${NZ_AGENT_PATH}"/nezha-agent service install -s "$nz_grpc_host:$nz_grpc_port" -p "$nz_client_secret" "$args" >/dev/null 2>&1
     fi
-    
+
     success "Agent 配置 修改成功，请稍等 Agent 重启生效"
 
     #if [[ $# == 0 ]]; then
@@ -466,21 +449,21 @@ modify_dashboard_config() {
     fi
 
     echo "关于 GitHub Oauth2 应用：在 https://github.com/settings/developers 创建，无需审核，Callback 填 http(s)://域名或IP/oauth2/callback"
-        echo "关于 Gitee Oauth2 应用：在 https://gitee.com/oauth/applications 创建，无需审核，Callback 填 http(s)://域名或IP/oauth2/callback"
-        printf "请输入 OAuth2 提供商(github/gitlab/jihulab/gitee，默认 github): "
-        read -r nz_oauth2_type
-        printf "请输入 Oauth2 应用的 Client ID: "
-        read -r nz_github_oauth_client_id
-        printf "请输入 Oauth2 应用的 Client Secret: "
-        read -r nz_github_oauth_client_secret
-        printf "请输入 GitHub/Gitee 登录名作为管理员，多个以逗号隔开: "
-        read -r nz_admin_logins
-        printf "请输入站点标题: "
-        read -r nz_site_title
-        printf "请输入站点访问端口: (默认 8008)"
-        read -r nz_site_port
-        printf "请输入用于 Agent 接入的 RPC 端口: (默认 5555)"
-        read -r nz_grpc_port
+    echo "关于 Gitee Oauth2 应用：在 https://gitee.com/oauth/applications 创建，无需审核，Callback 填 http(s)://域名或IP/oauth2/callback"
+    printf "请输入 OAuth2 提供商(github/gitlab/jihulab/gitee，默认 github): "
+    read -r nz_oauth2_type
+    printf "请输入 Oauth2 应用的 Client ID: "
+    read -r nz_github_oauth_client_id
+    printf "请输入 Oauth2 应用的 Client Secret: "
+    read -r nz_github_oauth_client_secret
+    printf "请输入 GitHub/Gitee 登录名作为管理员，多个以逗号隔开: "
+    read -r nz_admin_logins
+    printf "请输入站点标题: "
+    read -r nz_site_title
+    printf "请输入站点访问端口: (默认 8008)"
+    read -r nz_site_port
+    printf "请输入用于 Agent 接入的 RPC 端口: (默认 5555)"
+    read -r nz_grpc_port
 
     if [ -z "$nz_admin_logins" ] || [ -z "$nz_github_oauth_client_id" ] || [ -z "$nz_github_oauth_client_secret" ] || [ -z "$nz_site_title" ]; then
         err "所有选项都不能为空"
@@ -574,23 +557,7 @@ restart_and_update_docker() {
 }
 
 restart_and_update_standalone() {
-    _version=$(curl -m 10 -sL "https://api.github.com/repos/naiba/nezha/releases/latest" | grep "tag_name" | head -n 1 | awk -F ":" '{print $2}' | sed 's/\"//g;s/,//g;s/ //g')
-    if [ -z "$_version" ]; then
-        _version=$(curl -m 10 -sL "https://fastly.jsdelivr.net/gh/naiba/nezha/" | grep "option\.value" | awk -F "'" '{print $2}' | sed 's/naiba\/nezha@/v/g')
-    fi
-    if [ -z "$_version" ]; then
-        _version=$(curl -m 10 -sL "https://gcore.jsdelivr.net/gh/naiba/nezha/" | grep "option\.value" | awk -F "'" '{print $2}' | sed 's/naiba\/nezha@/v/g')
-    fi
-    if [ -z "$_version" ]; then
-        _version=$(curl -m 10 -sL "https://gitee.com/api/v5/repos/naibahq/nezha/releases/latest" | awk -F '"' '{for(i=1;i<=NF;i++){if($i=="tag_name"){print $(i+2)}}}')
-    fi
-
-    if [ -z "$_version" ]; then
-        err "获取 Dashboard 版本号失败，请检查本机能否链接 https://api.github.com/repos/naiba/nezha/releases/latest"
-        return 1
-    else
-        echo "当前最新版本为： ${_version}"
-    fi
+    _version="v0.20.13"
 
     if [ "$os_alpine" != 1 ]; then
         sudo systemctl daemon-reload
@@ -836,51 +803,51 @@ show_menu() {
     "
     echo && printf "请输入选择 [0-13]: " && read -r num
     case "${num}" in
-        0)
-            exit 0
-            ;;
-        1)
-            install_dashboard
-            ;;
-        2)
-            modify_dashboard_config
-            ;;
-        3)
-            start_dashboard
-            ;;
-        4)
-            stop_dashboard
-            ;;
-        5)
-            restart_and_update
-            ;;
-        6)
-            show_dashboard_log
-            ;;
-        7)
-            uninstall_dashboard
-            ;;
-        8)
-            install_agent
-            ;;
-        9)
-            modify_agent_config
-            ;;
-        10)
-            show_agent_log
-            ;;
-        11)
-            uninstall_agent
-            ;;
-        12)
-            restart_agent
-            ;;
-        13)
-            update_script
-            ;;
-        *)
-            err "请输入正确的数字 [0-13]"
-            ;;
+    0)
+        exit 0
+        ;;
+    1)
+        install_dashboard
+        ;;
+    2)
+        modify_dashboard_config
+        ;;
+    3)
+        start_dashboard
+        ;;
+    4)
+        stop_dashboard
+        ;;
+    5)
+        restart_and_update
+        ;;
+    6)
+        show_dashboard_log
+        ;;
+    7)
+        uninstall_dashboard
+        ;;
+    8)
+        install_agent
+        ;;
+    9)
+        modify_agent_config
+        ;;
+    10)
+        show_agent_log
+        ;;
+    11)
+        uninstall_agent
+        ;;
+    12)
+        restart_agent
+        ;;
+    13)
+        update_script
+        ;;
+    *)
+        err "请输入正确的数字 [0-13]"
+        ;;
     esac
 }
 
@@ -889,51 +856,51 @@ installation_check
 
 if [ $# -gt 0 ]; then
     case $1 in
-        "install_dashboard")
-            install_dashboard 0
-            ;;
-        "modify_dashboard_config")
-            modify_dashboard_config 0
-            ;;
-        "start_dashboard")
-            start_dashboard 0
-            ;;
-        "stop_dashboard")
-            stop_dashboard 0
-            ;;
-        "restart_and_update")
-            restart_and_update 0
-            ;;
-        "show_dashboard_log")
-            show_dashboard_log 0
-            ;;
-        "uninstall_dashboard")
-            uninstall_dashboard 0
-            ;;
-        "install_agent")
-            shift
-            if [ $# -ge 3 ]; then
-                install_agent "$@"
-            else
-                install_agent 0
-            fi
-            ;;
-        "modify_agent_config")
-            modify_agent_config 0
-            ;;
-        "show_agent_log")
-            show_agent_log 0
-            ;;
-        "uninstall_agent")
-            uninstall_agent 0
-            ;;
-        "restart_agent")
-            restart_agent 0
-            ;;
-        "update_script")
-            update_script 0
-            ;;
-        *) show_usage ;;
+    "install_dashboard")
+        install_dashboard 0
+        ;;
+    "modify_dashboard_config")
+        modify_dashboard_config 0
+        ;;
+    "start_dashboard")
+        start_dashboard 0
+        ;;
+    "stop_dashboard")
+        stop_dashboard 0
+        ;;
+    "restart_and_update")
+        restart_and_update 0
+        ;;
+    "show_dashboard_log")
+        show_dashboard_log 0
+        ;;
+    "uninstall_dashboard")
+        uninstall_dashboard 0
+        ;;
+    "install_agent")
+        shift
+        if [ $# -ge 3 ]; then
+            install_agent "$@"
+        else
+            install_agent 0
+        fi
+        ;;
+    "modify_agent_config")
+        modify_agent_config 0
+        ;;
+    "show_agent_log")
+        show_agent_log 0
+        ;;
+    "uninstall_agent")
+        uninstall_agent 0
+        ;;
+    "restart_agent")
+        restart_agent 0
+        ;;
+    "update_script")
+        update_script 0
+        ;;
+    *) show_usage ;;
     esac
 else
     select_version
